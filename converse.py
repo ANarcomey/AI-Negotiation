@@ -147,12 +147,12 @@ def checkCompromise(line, words, words_lower):
         index = words_lower.index("if")
         if (words_lower[index + 1] == "i"):
             #format of "you take these, if i take these"
-            takenItems = extractItemCounts(words[index+1:].join(" "))
-            givenItems = extractItemCounts(words[:index].join(" "))
+            takenItems = extractItemCounts(" ".join(words[index+1:]))
+            givenItems = extractItemCounts(" ".join(words[:index]))
         elif (words_lower[index + 1] == "you"):
             #format of "i'll take these if you take those"
-            givenItems = extractItemCounts(words[index+1:].join(" "))
-            takenItems = extractItemCounts(words[:index].join(" "))
+            givenItems = extractItemCounts(" ".join(words[index+1:]))
+            takenItems = extractItemCounts(" ".join(words[:index]))
         else:
             return None
 
@@ -182,21 +182,21 @@ def testResponses(input_file):
         compromise = checkCompromise(line, words, words_lower)
         if(compromise != None):
             if compromise[0] == [0]*len(items) and compromise[1] == [0]*len(items):
-                print("It seems like you wanted a compromise but I din't know what you want to give me " \
+                print("It seems like you wanted a compromise but I din't know what you want to give me " +
                     "or what you want in return")
                 continue
 
             if compromise[0] == [0]*len(items):
-                print("It seems like you wanted a compromise but didn't give me anything in return for " \
+                print("It seems like you wanted a compromise but didn't give me anything in return for " +
                     "you taking " + countsToString(compromise[1]))
                 continue
 
             if compromise[1] == [0]*len(items):
-                print("It seems like you wanted a compromise but didn't ask for anything in return for " \
+                print("It seems like you wanted a compromise but didn't ask for anything in return for " +
                     "giving me " + countsToString(compromise[0]))
                 continue
 
-            print("Are you suggesting to give me " + countsToString(compromise[0]) + " in return for " /
+            print("Are you suggesting to give me " + countsToString(compromise[0]) + " in return for " +
                     "you taking " + countsToString(compromise[1]))
             continue
 
@@ -208,6 +208,8 @@ def testResponses(input_file):
 
         if (input is a request):
             print("Are you asking for: " + countsToString(estimated_counts) + "?")'''
+
+        print("Are you asking for: " + countsToString(estimated_counts) + "?")
 
 
 
