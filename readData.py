@@ -114,8 +114,9 @@ def parseOutput(line, verbose = False):
     agentOutputs = []
     player = "YOU"
     for i in range(len(items)):
+
         count_str = output_arr[i]
-        if(count_str == "<disagree>"):
+        if(count_str == "<disagree>" or count_str == "<no_agreement>"):
             count = -1
         else:
             count_matches = re.findall("item\d+=(\d+)", count_str)
@@ -133,7 +134,7 @@ def parseOutput(line, verbose = False):
     player = "THEM"
     for i in range(len(items)):
         count_str = output_arr[len(items) + i]
-        if(count_str == "<disagree>"):
+        if(count_str == "<disagree>" or count_str == "<no_agreement>"):
             count = -1
         else:
             count_matches = re.findall("item\d+=(\d+)", count_str)
@@ -189,7 +190,7 @@ def parsePartnerInput(line, verbose = False):
 
 def exploreTrainingData(filepath):
 
-    num_examples_to_parse = 5
+    num_examples_to_parse = 20
     Examples = []
 
     if not os.path.isfile(filepath):
@@ -223,7 +224,7 @@ def parseExample(line):
     #print(dialogueToString(dialogue))
     example_dict["dialogue"] = dialogue
 
-    output = parseOutput(line, verbose = False)
+    output = parseOutput(line, verbose = True)
     #print(outputToString(output))
     example_dict["output"] = output
 
