@@ -206,26 +206,32 @@ def exploreTrainingData(filepath):
 
         print("\n\n\nline {} contents:\n {}".format(i, line))
 
-        input_tuples = parseInput(line, verbose = False)
-        #print(inputToString(input_tuples))
-        example_dict["input"] = input_tuples
-
-        dialogue = parse_dialogue(line, verbose = False)
-        #print(dialogueToString(dialogue))
-        example_dict["dialogue"] = dialogue
-
-        output = parseOutput(line, verbose = False)
-        #print(outputToString(output))
-        example_dict["output"] = output
-
-        partnerInput = parsePartnerInput(line, verbose = False)
-        #print(partnerInputToString(partnerInput))
-        example_dict["partner input"] = partnerInput
+        example_dict = parseExample(line)
 
         Examples.append(example_dict)
 
     with open("data/train.json", "w") as fp_json:
         json.dump(Examples, fp_json)
+
+def parseExample(line):
+    example_dict = {}
+    input_tuples = parseInput(line, verbose = False)
+    #print(inputToString(input_tuples))
+    example_dict["input"] = input_tuples
+
+    dialogue = parse_dialogue(line, verbose = False)
+    #print(dialogueToString(dialogue))
+    example_dict["dialogue"] = dialogue
+
+    output = parseOutput(line, verbose = False)
+    #print(outputToString(output))
+    example_dict["output"] = output
+
+    partnerInput = parsePartnerInput(line, verbose = False)
+    #print(partnerInputToString(partnerInput))
+    example_dict["partner input"] = partnerInput
+
+    return example_dict
 
         
 def exampleToString(example):
@@ -245,7 +251,7 @@ if __name__ == '__main__':
     exploreTrainingData(args.train_data)
 
     ##to load json file:
-    with open("data/train.json", "r") as fp:
+    with open(args.train_data_json, "r") as fp:
         Examples = json.load(fp)
 
     print("\n\n\n\n\n Displaying training examples loaded from json:")
@@ -254,6 +260,7 @@ if __name__ == '__main__':
         print("\n")
         print(exampleToString(ex))
         print("\n\n\n\n")
+
 
     
 
