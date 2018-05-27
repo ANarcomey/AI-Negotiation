@@ -2,6 +2,7 @@
 import sys  
 import os
 import re
+import json
 
 import numpy
 
@@ -37,8 +38,8 @@ def parseInput(line, verbose = False):
     input_tuples = []
 
     for item_i in range(len(items)):
-        count = input_arr[2*item_i]
-        value = input_arr[2*item_i + 1]
+        count = int(input_arr[2*item_i])
+        value = int(input_arr[2*item_i + 1])
         input_tuples.append((count, value))
 
     if(verbose):
@@ -46,7 +47,7 @@ def parseInput(line, verbose = False):
 
     return input_tuples
 
-def dialogue_to_string(dialogue):
+def dialogueToString(dialogue):
 
     result = "\nDialogue sequence:\n"
     for sentence in dialogue:
@@ -62,7 +63,9 @@ def parse_dialogue(line, verbose = False):
     assert(len(dialogue_matches) == 1)
 
     full_dialogue = dialogue_matches[0]
-    sentences = re.findall("(YOU|THEM): (.*?) <eos>", full_dialogue)
+    #each utterance ends in <eos>, last utterance is <selection> which ends conversation and
+    #marks the end of dialogue string
+    sentences = re.findall("(YOU|THEM): (.*?) (?:<eos>|$)", full_dialogue)
 
     if (verbose):
         print("\nDialogue match = {}".format(dialogue_matches))
@@ -81,7 +84,22 @@ def parse_dialogue(line, verbose = False):
 
     return dialogue
 
+def outputToString(output):
+    result = "Output: "
+    result += "\nYOU: "
+    agentOutput = output[0]
+    for i, item in enumerate(items):
+        result += "{}=(count:{}), ".format(item, agentOutput[i])
+    #trim last comma and space
+    result = result[:-2]
 
+    result += "\nTHEM: "
+    opponentOutput = output[1]
+    for i, item in enumerate(items):
+        result += "{}=(count:{}), ".format(item, opponentOutput[i])
+    #trim last comma and space
+    result = result[:-2]
+    return result + "\n"
 
 def parseOutput(line, verbose = False):
     output_matches = re.findall("<output> (.*)? </output>", line)
@@ -132,42 +150,42 @@ def parseOutput(line, verbose = False):
         print("Output as string = \"{}\"".format(output_str))
         print("Output as array = {}".format(output_arr))
 
-    outputs = [("YOU", agentOutputs), ("THEM", opponentOutputs)]
+    outputs = [agentOutputs, opponentOutputs]
 
     return outputs
 
-def partnerSelectionToString(selection_tuples):
-    result = "Partner Selection: "
+def partnerInputToString(input_tuples):
+    result = "Partner Input: "
     for i, item in enumerate(items):
-        result += "{}=(count:{} value:{}), ".format(item, selection_tuples[i][0], selection_tuples[i][1])
+        result += "{}=(count:{} value:{}), ".format(item, input_tuples[i][0], input_tuples[i][1])
     #trim last comma and space
     return result[:-2]
 
-def parsePartnerSelection(line, verbose = False):
+def parsePartnerInput(line, verbose = False):
     ### TODO: unify with parsing of input??? same formatting
 
-    selection_matches = re.findall("<partner_input> (.*)? </partner_input>", line)
-    assert(len(selection_matches) == 1)
+    input_matches = re.findall("<partner_input> (.*)? </partner_input>", line)
+    assert(len(input_matches) == 1)
 
-    selection_str = selection_matches[0]
-    selection_arr = numpy.fromstring(selection_str, dtype=int, sep=" ")
-    assert(len(selection_arr) == INPUT_SIZE)
+    input_str = input_matches[0]
+    input_arr = numpy.fromstring(input_str, dtype=int, sep=" ")
+    assert(len(input_arr) == INPUT_SIZE)
     if(verbose): 
-        print("Partner selection as string = {}".format(selection_str))
-        print("Partner selection as array = {}".format(selection_arr))
+        print("Partner Input as array = {}".format(input_arr))
 
     ### formatted as: book=(count:x1 value:x2) hat=(count:x3 value:x4) ball=(count:x5 value:x6)
-    selection_tuples = []
+    input_tuples = []
 
     for item_i in range(len(items)):
-        count = selection_arr[2*item_i]
-        value = selection_arr[2*item_i + 1]
-        selection_tuples.append((count, value))
+        count = int(input_arr[2*item_i])
+        value = int(input_arr[2*item_i + 1])
+        input_tuples.append((count, value))
 
     if(verbose):
-        print("Partner selection as tuples = {}".format(selection_tuples))
+        print("Partner Input as tuples = {}".format(input_tuples))
 
-    return selection_tuples
+    return input_tuples
+    
 
 def exploreTrainingData(filepath):
 
@@ -188,29 +206,35 @@ def exploreTrainingData(filepath):
 
         print("\n\n\nline {} contents:\n {}".format(i, line))
 
-        input_tuples = parseInput(line, verbose = True)
-        print(inputToString(input_tuples))
+        input_tuples = parseInput(line, verbose = False)
+        #print(inputToString(input_tuples))
         example_dict["input"] = input_tuples
 
-        dialogue = parse_dialogue(line, verbose = True)
-        print(dialogue_to_string(dialogue))
+        dialogue = parse_dialogue(line, verbose = False)
+        #print(dialogueToString(dialogue))
         example_dict["dialogue"] = dialogue
 
-        output = parseOutput(line, verbose = True)
-        print("Output = {}".format(output))
+        output = parseOutput(line, verbose = False)
+        #print(outputToString(output))
         example_dict["output"] = output
 
-        partnerSelection = parsePartnerSelection(line, verbose = True)
-        print(partnerSelectionToString(partnerSelection))
-        example_dict["partner selection"] = partnerSelection
+        partnerInput = parsePartnerInput(line, verbose = False)
+        #print(partnerInputToString(partnerInput))
+        example_dict["partner input"] = partnerInput
 
         Examples.append(example_dict)
 
-
+    with open("data/train.json", "w") as fp_json:
+        json.dump(Examples, fp_json)
 
         
-
-        
+def exampleToString(example):
+    result = "Example as string:\n"
+    result += inputToString(example["input"])
+    result += dialogueToString(example["dialogue"])
+    result += outputToString(example["output"])
+    result += partnerInputToString(example["partner input"])
+    return result
 
 
 
@@ -219,6 +243,17 @@ if __name__ == '__main__':
     args = parse_arguments()
 
     exploreTrainingData(args.train_data)
+
+    ##to load json file:
+    with open("data/train.json", "r") as fp:
+        Examples = json.load(fp)
+
+    print("\n\n\n\n\n Displaying training examples loaded from json:")
+    for ex in Examples:
+        print(ex)
+        print("\n")
+        print(exampleToString(ex))
+        print("\n\n\n\n")
 
     
 
