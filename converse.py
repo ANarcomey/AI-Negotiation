@@ -2,11 +2,13 @@ import sys
 import os
 import re
 import json
+import random
 
-import numpy
+import numpy as np
 
 from config import parse_arguments
 from readData import exampleToString, parseExample
+from readData import inputToString, partnerInputToString
 import utils
 
 items = ["book", "hat", "ball"]
@@ -139,6 +141,14 @@ def terminatedConversation(line, words, words_lower):
     else:
         return False
 
+def terminatedConversation2(line):
+    words_lower = tokenize(input_str.lower())
+
+    if ("done" in words_lower or "deal" in words_lower):
+        return True
+    else:
+        return False
+
 
 #TODO: improve detection if opponent is offering a compromise
 def checkCompromise(line, words, words_lower):
@@ -214,8 +224,88 @@ def testResponses(input_file):
 
 
 
+def completeConversation(trainExamples):
+
+    import pdb; pdb.set_trace()
+
+    
+
+    while(True):
+        index = random.choice(range(len(trainExamples)))
+        ex = trainExamples[index]
+
+        conversation_input = ex["input"]
+        #print(inputToString(conversation_input))
+        partner_input = ex["partner input"]
+        print(partnerInputToString(partner_input))
+
+        input_counts = [count for count,value in conversation_input]
+        input_values = [value for count,value in conversation_input]
+        value_sort = np.argsort(input_values)
+
+        mostValuableIndex = value_sort[len(items) -1]
+        leastValuableIndex = value_sort[0]
 
 
+
+        botStarting = random.choice([True, False])
+        if (not botStarting):
+            while(True):
+                input_str = input('Enter a request: ')
+                if(input_str == "<selection>"):
+                    break
+
+                if(terminatedConversation2(input_str)):
+                    print("<selection>")
+                    break;
+
+                requested_counts = extractItemCounts(input_str)
+                remaining_counts = [0]*len(items)
+                for i in range(len(items)):
+                    if requested_counts[i]==-1:
+                        remaining_counts[i] = 0
+                    else:
+                        remaining_counts[i] = max(input_counts[i] - requested_counts[i],0)
+
+                if requested_counts[mostValuableIndex] != 0:
+                    #print("Not good, how about I take the " + plural_items[mostValuableIndex] + "and " +
+                    print("Not good, how about I take the " + plural_items[mostValuableIndex] + " and the rest " +
+                        "is yours")
+
+
+        else:
+            print("How about I take the " + plural_items[mostValuableIndex] + " and the rest " +
+                        "is yours")
+            while(True):
+                input_str = input('Enter a request: ')
+                if(input_str == "<selection>"):
+                    break
+                    
+                if(terminatedConversation2(input_str)):
+                    print("<selection>")
+                    break;
+
+
+                requested_counts = extractItemCounts(input_str)
+                remaining_counts = [0]*len(items)
+                for i in range(len(items)):
+                    if requested_counts[i]==-1:
+                        remaining_counts[i] = 0
+                    else:
+                        remaining_counts[i] = max(input_counts[i] - requested_counts[i],0)
+
+                if requested_counts[mostValuableIndex] != 0:
+                    #print("Not good, how about I take the " + plural_items[mostValuableIndex] + "and " +
+                    print("Not good, how about I take the " + plural_items[mostValuableIndex] + " and the rest " +
+                        "is yours")
+
+
+
+
+
+        sentinel = input("Type 'quit' to exit, anything else to run another example: ")
+        if (sentinel == 'quit'):
+            break
 
 
 
@@ -229,8 +319,10 @@ if __name__ == '__main__':
 
     #testFeatureExtraction()
 
-    simpleTest("testing/parseCountsTests.txt")
+    #simpleTest("testing/parseCountsTests.txt")
 
-    testResponses("testing/inputs.txt")
+    #testResponses("testing/inputs.txt")
+
+    completeConversation(trainExamples)
 
 
