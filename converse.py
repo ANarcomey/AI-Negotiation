@@ -8,7 +8,6 @@ import numpy as np
 
 from config import parse_arguments
 from readData import exampleToString, parseExample
-from readData import inputToString, partnerInputToString
 import utils
 
 items = ["book", "hat", "ball"]
@@ -141,7 +140,7 @@ def terminatedConversation(line, words, words_lower):
     else:
         return False
 
-def terminatedConversation2(line):
+def terminatedConversation2(input_str):
     words_lower = tokenize(input_str.lower())
 
     if ("done" in words_lower or "deal" in words_lower):
@@ -222,11 +221,23 @@ def testResponses(input_file):
         print("Are you asking for: " + countsToString(estimated_counts) + "?")
 
 
+def countsToString(counts):
+    result = ""
+    for i, item in enumerate(items):
+        result += "{}=(count:{}), ".format(item, counts[i])
+    #trim last comma and space
+    return result[:-2]
 
+def inputToString(input):
+    result = ""
+    for i, item in enumerate(items):
+        result += "{}=(count:{} value:{}), ".format(item, input[i][0], input[i][1])
+    #trim last comma and space
+    return result[:-2]
 
 def completeConversation(trainExamples):
 
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
 
     
 
@@ -234,72 +245,88 @@ def completeConversation(trainExamples):
         index = random.choice(range(len(trainExamples)))
         ex = trainExamples[index]
 
-        conversation_input = ex["input"]
-        #print(inputToString(conversation_input))
-        partner_input = ex["partner input"]
-        print(partnerInputToString(partner_input))
+        bot_input = ex["input"]
+        opponent_input = ex["partner input"]
+        print("Opponent input = " + inputToString(opponent_input))
 
-        input_counts = [count for count,value in conversation_input]
-        input_values = [value for count,value in conversation_input]
-        value_sort = np.argsort(input_values)
+        total_counts = [count for count,value in bot_input]
+        bot_values = [value for count,value in bot_input]
+        opponent_values = [value for count,value in opponent_input]
 
-        mostValuableIndex = value_sort[len(items) -1]
-        leastValuableIndex = value_sort[0]
+        bot_value_sort = np.argsort((np.multiply(bot_values, total_counts)))
 
+        mostValuableIndex = bot_value_sort[len(items) -1]
+        middleIndex = bot_value_sort[1]
+        leastValuableIndex = bot_value_sort[0]
+
+        botItems, opponentItems = None, None
+
+        attemptedTopItem = False
+        num_attempts = 0
 
 
         botStarting = random.choice([True, False])
-        if (not botStarting):
-            while(True):
-                input_str = input('Enter a request: ')
-                if(input_str == "<selection>"):
-                    break
-
-                if(terminatedConversation2(input_str)):
-                    print("<selection>")
-                    break;
-
-                requested_counts = extractItemCounts(input_str)
-                remaining_counts = [0]*len(items)
-                for i in range(len(items)):
-                    if requested_counts[i]==-1:
-                        remaining_counts[i] = 0
-                    else:
-                        remaining_counts[i] = max(input_counts[i] - requested_counts[i],0)
-
-                if requested_counts[mostValuableIndex] != 0:
-                    #print("Not good, how about I take the " + plural_items[mostValuableIndex] + "and " +
-                    print("Not good, how about I take the " + plural_items[mostValuableIndex] + " and the rest " +
-                        "is yours")
-
-
-        else:
+        if(botStarting):
             print("How about I take the " + plural_items[mostValuableIndex] + " and the rest " +
                         "is yours")
-            while(True):
-                input_str = input('Enter a request: ')
-                if(input_str == "<selection>"):
-                    break
-                    
-                if(terminatedConversation2(input_str)):
-                    print("<selection>")
-                    break;
+            botItems = [0]*len(items)
+            botItems[mostValuableIndex] = total_counts[mostValuableIndex]
+            opponentItems = total_counts[:]
+            opponentItems[mostValuableIndex] = 0
+        while(True):
+            input_str = input('Enter a request: ')
+            if(input_str == "<selection>"):
+                break
 
+            if(terminatedConversation2(input_str)):
+                print("<selection>")
+                break;
 
-                requested_counts = extractItemCounts(input_str)
-                remaining_counts = [0]*len(items)
-                for i in range(len(items)):
-                    if requested_counts[i]==-1:
-                        remaining_counts[i] = 0
-                    else:
-                        remaining_counts[i] = max(input_counts[i] - requested_counts[i],0)
+            if (num_attempts > 5):
+                print("We are at an impasse, no deal")
+                botItems = [0]*len(items)
+                opponentItems = [0]*len(items)
+                break;
 
-                if requested_counts[mostValuableIndex] != 0:
-                    #print("Not good, how about I take the " + plural_items[mostValuableIndex] + "and " +
+            requested_counts = extractItemCounts(input_str)
+            adjusted_requested_counts = requested_counts[:]
+            remaining_counts = [0]*len(items)
+            for i in range(len(items)):
+                if requested_counts[i]==-1:
+                    adjusted_requested_counts[i] = total_counts[i]
+                    remaining_counts[i] = 0
+                else:
+                    remaining_counts[i] = max(total_counts[i] - requested_counts[i],0)
+
+            if adjusted_requested_counts[mostValuableIndex] > 0:
+                num_attempts += 1
+                if not attemptedTopItem:
                     print("Not good, how about I take the " + plural_items[mostValuableIndex] + " and the rest " +
                         "is yours")
+                    attemptedTopItem = True
+
+                    botItems = [0]*len(items)
+                    botItems[mostValuableIndex] = total_counts[mostValuableIndex]
+                    opponentItems = total_counts[:]
+                    opponentItems[mostValuableIndex] = 0
+                else:
+                    print("How about I take the " + plural_items[leastValuableIndex] + " and the " +
+                         plural_items[middleIndex] + " and the rest is yours")
+                    botItems = total_counts[:]
+                    botItems[mostValuableIndex] = 0
+                    opponentItems = [0]*len(items)
+                    opponentItems[mostValuableIndex] = total_counts[mostValuableIndex]
+            else:
+                print("Okay, we have a deal")
+                opponentItems = adjusted_requested_counts[:]
+                botItems = remaining_counts[:]
 
 
+        print("Bot input:" + inputToString(bot_input))
+        print("Final: bot items = " + countsToString(botItems))
+        print("Final: opponent items = " + countsToString(opponentItems))
+        print("Bot score = ", np.sum(np.multiply(botItems, bot_values)))
+        print("Opponent score = ", np.sum(np.multiply(opponentItems, opponent_values)))
 
 
 
@@ -307,6 +334,224 @@ def completeConversation(trainExamples):
         if (sentinel == 'quit'):
             break
 
+class chatBot:
+    def __init__(self, bot_input):
+        self.total_counts = [count for count,value in bot_input]
+        self.bot_values = [value for count,value in bot_input]
+
+        self.bot_value_sort = np.argsort((np.multiply(self.bot_values, self.total_counts)))
+
+        self.mostValuableIndex = self.bot_value_sort[len(items) -1]
+        self.middleIndex = self.bot_value_sort[1]
+        self.leastValuableIndex = self.bot_value_sort[0]
+
+        self.botItems, opponentItems = None, None
+
+        self.attemptedTopItem = False
+        self.num_attempts = 0
+
+    def openNegotiation(self):
+        responseBuffer = ("How about I take the " + plural_items[self.mostValuableIndex] + " and the rest " +
+                        "is yours")
+        self.botItems = [0]*len(items)
+        self.botItems[self.mostValuableIndex] = self.total_counts[self.mostValuableIndex]
+        self.opponentItems = self.total_counts[:]
+        self.opponentItems[self.mostValuableIndex] = 0
+        return responseBuffer
+
+    def respond(self,input_str):
+
+        if(terminatedConversation2(input_str)):
+            return "<selection>"
+
+        if (self.num_attempts > 5):
+            print("We are at an impasse, no deal")
+            self.botItems = [0]*len(items)
+            self.opponentItems = [0]*len(items)
+            return "<selection>"
+
+        responseBuffer = None
+
+        requested_counts = extractItemCounts(input_str)
+        adjusted_requested_counts = requested_counts[:]
+        remaining_counts = [0]*len(items)
+        for i in range(len(items)):
+            if requested_counts[i]==-1:
+                adjusted_requested_counts[i] = self.total_counts[i]
+                remaining_counts[i] = 0
+            else:
+                remaining_counts[i] = max(self.total_counts[i] - requested_counts[i],0)
+
+        if adjusted_requested_counts[self.mostValuableIndex] > 0:
+            self.num_attempts += 1
+            if not self.attemptedTopItem:
+                responseBuffer = ("Not good, how about I take the " + plural_items[self.mostValuableIndex] + " and the rest " +
+                    "is yours")
+                self.attemptedTopItem = True
+
+                self.botItems = [0]*len(items)
+                self.botItems[self.mostValuableIndex] = self.total_counts[self.mostValuableIndex]
+                self.opponentItems = self.total_counts[:]
+                self.opponentItems[self.mostValuableIndex] = 0
+            else:
+                responseBuffer = ("How about I take the " + plural_items[self.leastValuableIndex] + " and the " +
+                     plural_items[self.middleIndex] + " and the rest is yours")
+                self.botItems = self.total_counts[:]
+                self.botItems[self.mostValuableIndex] = 0
+                self.opponentItems = [0]*len(items)
+                self.opponentItems[self.mostValuableIndex] = self.total_counts[self.mostValuableIndex]
+        else:
+            responseBuffer = ("Okay, we have a deal")
+            self.opponentItems = adjusted_requested_counts[:]
+            self.botItems = remaining_counts[:]
+
+        return responseBuffer
+
+
+
+
+
+
+def botToBot(trainExamples):
+
+    while(True):
+        index = random.choice(range(len(trainExamples)))
+        ex = trainExamples[index]
+
+        bot1_input = ex["input"]
+        bot2_input = ex["partner input"]
+        print("Bot1 input = " + inputToString(bot1_input))
+        print("Bot2 input = " + inputToString(bot2_input))
+
+        bot1 = chatBot(bot1_input)
+        bot2 = chatBot(bot2_input)
+
+        negotiatonOver = False
+        bot1Starting = random.choice([True, False])
+        bot1Response = None
+        if(bot1Starting):
+            bot1Response = bot1.openNegotiation()
+        else:
+            bot2Response = bot2.openNegotiation()
+            print("Bot2: " + bot2Response)
+            if bot2Response == "<selection>":
+                negotiatonOver = True
+            else:
+                bot1Response = bot1.respond(bot2Response)
+
+        if(not negotiatonOver):
+            while(True):
+                print("Bot1: " + bot1Response)
+                if bot1Response == "<selection>":
+                    break
+                bot2Response = bot2.respond(bot1Response)
+                print("Bot2: " + bot2Response)
+                if bot2Response == "<selection>":
+                    break
+                bot1Response = bot1.respond(bot2Response)
+
+
+
+
+        print("Final: bot1 items = " + countsToString(bot1.botItems))
+        print("Final: bot2 items = " + countsToString(bot2.botItems))
+        print("Bot1 score = ", np.sum(np.multiply(bot1.botItems, bot1.bot_values)))
+        print("Bot2 score = ", np.sum(np.multiply(bot2.botItems, bot2.bot_values)))
+
+
+
+        sentinel = input("Type 'quit' to exit, anything else to run another example: ")
+        if (sentinel == 'quit'):
+            break
+
+def botToBotTest(trainExamples):
+
+    print("Num examples = ", len(trainExamples))
+
+    index = 0
+
+    total_negotations = 0
+    num_agree = 0
+
+    total_starter_score = 0
+    total_responder_score = 0
+
+
+    while(index < len(trainExamples)):
+
+        ex = trainExamples[index]
+
+        bot1_input = ex["input"]
+        bot2_input = ex["partner input"]
+        #print("Bot1 input = " + inputToString(bot1_input))
+        #print("Bot2 input = " + inputToString(bot2_input))
+
+        bot1 = chatBot(bot1_input)
+        bot2 = chatBot(bot2_input)
+
+        negotiatonOver = False
+        bot1Starting = random.choice([True, False])
+        bot1Response = None
+        if(bot1Starting):
+            bot1Response = bot1.openNegotiation()
+        else:
+            bot2Response = bot2.openNegotiation()
+            #print("Bot2: " + bot2Response)
+            if bot2Response == "<selection>":
+                negotiatonOver = True
+            else:
+                bot1Response = bot1.respond(bot2Response)
+
+        if(not negotiatonOver):
+            while(True):
+                #print("Bot1: " + bot1Response)
+                if bot1Response == "<selection>":
+                    break
+                bot2Response = bot2.respond(bot1Response)
+                #print("Bot2: " + bot2Response)
+                if bot2Response == "<selection>":
+                    break
+                bot1Response = bot1.respond(bot2Response)
+
+
+
+
+        #print("Final: bot1 items = " + countsToString(bot1.botItems))
+        #print("Final: bot2 items = " + countsToString(bot2.botItems))
+        #print("Bot1 score = ", np.sum(np.multiply(bot1.botItems, bot1.bot_values)))
+        #print("Bot2 score = ", np.sum(np.multiply(bot2.botItems, bot2.bot_values)))
+        agreement = True
+        for i in range(len(items)):
+            if bot1.botItems[i] != bot2.opponentItems[i]:
+                agreement = False
+            if bot2.botItems[i] != bot1.opponentItems[i]:
+                agreement = False
+
+        if agreement:
+            num_agree += 1
+
+        bot1_score = np.sum(np.multiply(bot1.botItems, bot1.bot_values))
+        bot2_score = np.sum(np.multiply(bot2.botItems, bot2.bot_values))
+
+        if(bot1Starting):
+            total_starter_score += bot1_score
+            total_responder_score += bot2_score
+        else:
+            total_starter_score += bot2_score
+            total_responder_score += bot1_score
+
+        total_negotations += 1
+
+        index += 1
+
+
+    print("total negotiations = ", total_negotations)
+    print("num agreed = ", num_agree)
+    print("Agreement rate = ", num_agree/total_negotations)
+
+    print("average score for starting bot = ", total_starter_score/float(total_negotations))
+    print("average score for responding bot = ", total_responder_score/float(total_negotations))
+    print("average score overall = ", (total_starter_score + total_responder_score)/(total_negotations*2))
 
 
 
@@ -323,6 +568,9 @@ if __name__ == '__main__':
 
     #testResponses("testing/inputs.txt")
 
-    completeConversation(trainExamples)
+    #completeConversation(trainExamples)
+
+    #botToBot(trainExamples)
+    botToBotTest(trainExamples)
 
 

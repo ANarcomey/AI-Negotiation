@@ -116,7 +116,7 @@ def parseOutput(line, verbose = False):
     for i in range(len(items)):
 
         count_str = output_arr[i]
-        if(count_str == "<disagree>" or count_str == "<no_agreement>"):
+        if(count_str == "<disagree>" or count_str == "<no_agreement>" or count_str == "<disconnect>"):
             count = -1
         else:
             count_matches = re.findall("item\d+=(\d+)", count_str)
@@ -134,7 +134,7 @@ def parseOutput(line, verbose = False):
     player = "THEM"
     for i in range(len(items)):
         count_str = output_arr[len(items) + i]
-        if(count_str == "<disagree>" or count_str == "<no_agreement>"):
+        if(count_str == "<disagree>" or count_str == "<no_agreement>" or count_str == "<disconnect>"):
             count = -1
         else:
             count_matches = re.findall("item\d+=(\d+)", count_str)
@@ -190,7 +190,7 @@ def parsePartnerInput(line, verbose = False):
 
 def exploreTrainingData(filepath):
 
-    num_examples_to_parse = 20
+    num_examples_to_parse = 1000
     Examples = []
 
     if not os.path.isfile(filepath):
@@ -255,12 +255,12 @@ if __name__ == '__main__':
     with open(args.train_data_json, "r") as fp:
         Examples = json.load(fp)
 
-    print("\n\n\n\n\n Displaying training examples loaded from json:")
+    '''print("\n\n\n\n\n Displaying training examples loaded from json:")
     for ex in Examples:
         print(ex)
         print("\n")
         print(exampleToString(ex))
-        print("\n\n\n\n")
+        print("\n\n\n\n")'''
 
 
     
