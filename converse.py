@@ -239,6 +239,11 @@ def completeConversation(trainExamples):
 
     #import pdb; pdb.set_trace()
 
+    total_negotations = 0
+
+    total_bot_score = 0
+    total_opponent_score = 0
+
     
 
     while(True):
@@ -321,6 +326,12 @@ def completeConversation(trainExamples):
                 opponentItems = adjusted_requested_counts[:]
                 botItems = remaining_counts[:]
 
+        print("bot items = ", botItems)
+        print("bot values = ", bot_values)
+        total_negotations += 1
+        total_bot_score += np.sum(np.multiply(botItems, bot_values))
+        total_opponent_score += np.sum(np.multiply(opponentItems, opponent_values))
+
 
         print("Bot input:" + inputToString(bot_input))
         print("Final: bot items = " + countsToString(botItems))
@@ -329,10 +340,19 @@ def completeConversation(trainExamples):
         print("Opponent score = ", np.sum(np.multiply(opponentItems, opponent_values)))
 
 
-
+        #bot 55 -> 6.11 pts
+        #me 85 -> 9.44 pts
+        # total of 9 negotiations
         sentinel = input("Type 'quit' to exit, anything else to run another example: ")
         if (sentinel == 'quit'):
             break
+
+    print("total negotiations = ", total_negotations)
+
+    print("average score for bot = ", total_bot_score/float(total_negotations))
+    print("average score for opponent = ", total_opponent_score/float(total_negotations))
+    print("average score overall = ", (total_bot_score + total_opponent_score)/(total_negotations*2))
+
 
 class chatBot:
     def __init__(self, bot_input):
@@ -568,9 +588,9 @@ if __name__ == '__main__':
 
     #testResponses("testing/inputs.txt")
 
-    #completeConversation(trainExamples)
+    completeConversation(trainExamples)
 
     #botToBot(trainExamples)
-    botToBotTest(trainExamples)
+    #botToBotTest(trainExamples)
 
 
