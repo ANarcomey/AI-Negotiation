@@ -245,11 +245,30 @@ def exampleToString(example):
 
 
 
+def buildVocabulary(trainExamples, filepath):
+    vocabulary = set()
+
+    for i, ex in enumerate(trainExamples):
+        dialogue = ex["dialogue"]
+        for sentence in dialogue:
+            speaker = sentence[0]
+            utterance = sentence[1].split(" ")
+            for word in utterance:
+                if word not in vocabulary:
+                    vocabulary.add(word)
+
+    vocab_list = sorted(vocabulary)
+
+    with open(filepath, "w") as fp:
+        json.dump(vocab_list, fp)
+
+
+
 if __name__ == '__main__':
 
     args = parse_arguments()
 
-    exploreTrainingData(args.train_data)
+    #exploreTrainingData(args.train_data)
 
     ##to load json file:
     with open(args.train_data_json, "r") as fp:
@@ -261,6 +280,14 @@ if __name__ == '__main__':
         print("\n")
         print(exampleToString(ex))
         print("\n\n\n\n")'''
+
+    buildVocabulary(Examples, args.train_vocab_json)
+
+    with open(args.train_vocab_json, "r") as fp:
+        vocab = json.load(fp)
+        print("Loaded vocab = ", vocab)
+
+
 
 
     
