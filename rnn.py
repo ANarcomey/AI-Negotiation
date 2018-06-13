@@ -35,6 +35,13 @@ class RNNEncoder(nn.Module):
     def forward(self, input, prev_hidden, h_goals):
 
         #make sure input is N x input_dim, where N is batch size, which can just be 1
+        h_goals = h_goals.view(1, -1)
+        input = input.view(-1)
+
+        assert(input.shape == torch.Size([1]))
+        assert(h_goals.shape == torch.Size([1, self.goals_size]))
+        assert(prev_hidden.shape == torch.Size([1, self.hidden_dim]))
+
         embedded_input = self.embedding(input)
         input_combined = torch.cat((embedded_input, h_goals), 1)
         new_hidden = self.W_hx(input_combined) + self.W_hh(prev_hidden)
@@ -67,6 +74,13 @@ class RNNDecoder(nn.Module):
         #input is word embedding
 
         #make sure input is N x input_dim, where N is batch size, which can just be 1
+        h_goals = h_goals.view(1, -1)
+        input = input.view(-1)
+
+        assert(input.shape == torch.Size([1]))
+        assert(h_goals.shape == torch.Size([1, self.goals_size]))
+        assert(prev_hidden.shape == torch.Size([1, self.hidden_dim]))
+
         input_combined = torch.cat((input, self.h_goals, context), 1)
         new_hidden = self.W_hy(input_combined) + self.W_hh(prev_hidden)
         new_hidden = self.activation(new_hidden)
