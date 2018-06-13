@@ -121,7 +121,7 @@ def parseOutput(line, verbose = False):
         else:
             count_matches = re.findall("item\d+=(\d+)", count_str)
             assert (len(count_matches) == 1)
-            count = count_matches[0]
+            count = int(count_matches[0])
 
         agentOutputs.append(count)
 
@@ -139,7 +139,7 @@ def parseOutput(line, verbose = False):
         else:
             count_matches = re.findall("item\d+=(\d+)", count_str)
             assert (len(count_matches) == 1)
-            count = count_matches[0]
+            count = int(count_matches[0])
 
         opponentOutputs.append(count)
 
@@ -147,11 +147,14 @@ def parseOutput(line, verbose = False):
             print("Agent = {}, count as string = \"{}\", count = {}".format(player, count_str, count))
 
 
+    
+
+    outputs = [agentOutputs, opponentOutputs]
+
     if(verbose):
         print("Output as string = \"{}\"".format(output_str))
         print("Output as array = {}".format(output_arr))
-
-    outputs = [agentOutputs, opponentOutputs]
+        print("Final form of outputs = {}".format(outputs))
 
     return outputs
 
@@ -188,9 +191,8 @@ def parsePartnerInput(line, verbose = False):
     return input_tuples
     
 
-def exploreTrainingData(filepath):
+def exploreTrainingData(filepath, num_examples_to_parse = None):
 
-    num_examples_to_parse = 1000
     Examples = []
 
     if not os.path.isfile(filepath):
@@ -200,7 +202,7 @@ def exploreTrainingData(filepath):
     fp = open(filepath, 'r') 
 
     for i,line in enumerate(fp):
-        if (i >= num_examples_to_parse):
+        if (num_examples_to_parse != None and i >= num_examples_to_parse):
             break
 
         example_dict = {}
@@ -224,7 +226,7 @@ def parseExample(line):
     #print(dialogueToString(dialogue))
     example_dict["dialogue"] = dialogue
 
-    output = parseOutput(line, verbose = True)
+    output = parseOutput(line, verbose = False)
     #print(outputToString(output))
     example_dict["output"] = output
 
@@ -274,17 +276,19 @@ if __name__ == '__main__':
     with open(args.train_data_json, "r") as fp:
         Examples = json.load(fp)
 
-    '''print("\n\n\n\n\n Displaying training examples loaded from json:")
-    for ex in Examples:
+    print("\n\n\n\n\n Displaying training examples loaded from json:")
+    print("There are ", len(Examples), " training examples")
+    '''for ex in Examples:
         print(ex)
         print("\n")
         print(exampleToString(ex))
         print("\n\n\n\n")'''
 
-    buildVocabulary(Examples, args.train_vocab_json)
+    #buildVocabulary(Examples, args.train_vocab_json)
 
     with open(args.train_vocab_json, "r") as fp:
         vocab = json.load(fp)
+        print("There are ", len(vocab), "words in the vocabulary")
         print("Loaded vocab = ", vocab)
 
 
