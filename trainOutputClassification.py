@@ -76,11 +76,13 @@ def eval_output(outputs, target, example, verbose = False):
 
 #train Examples is list of dictionary entries, loaded from json
 def generateDataset(trainExamples, vocab, use_shuffle = True):
-    import pdb; pdb.set_trace()
+    
 
     vocab.append("<eos>")
     vocab.append("YOU")
     vocab.append("THEM")
+    if "<UNK>" not in vocab:
+        vocab.append("<UNK>")
     vocab = sorted(vocab)
 
     wordToIndex, indexToWord = utils.getIndexTranslations(vocab)
@@ -106,9 +108,8 @@ def generateDataset(trainExamples, vocab, use_shuffle = True):
             utterance = [speaker]
             utterance += sentence[1].split(" ")
             utterance += ["<eos>"]
-            #print("utterance = ", utterance)
 
-            utterance_idx = [wordToIndex[word] for word in utterance]
+            utterance_idx = [wordToIndex[word] if word in wordToIndex else wordToIndex["<UNK>"] for word in utterance]
             word_indexes += utterance_idx
 
         words_tensor = torch.tensor(word_indexes, dtype=torch.long)
@@ -157,12 +158,15 @@ def train(context, target, classifier, optimizer, criterion):
 
     return loss.item()/num_words, outputs
 
-def validate(validationSet, classifier, savedPath = None):
+def validate(validationSet, classifier, verbose = False, savedPath = None):
 
     if savedPath != None:
         classifier = torch.load("savedModels/outputClassifier.pth")
 
     classifier.eval()
+
+    cummulative_num_correct = 0
+    cummulative_total_diff = 0
     for context, target, example in validationSet:
 
         words_tensor, encoded_goals = context
@@ -174,12 +178,20 @@ def validate(validationSet, classifier, savedPath = None):
         for i in range(num_words):
             outputs, hidden = classifier(words_tensor[i], hidden, encoded_goals)
 
-        eval_output(outputs, target, example, verbose=True)
+        num_correct, total_diff = eval_output(outputs, target, example, verbose=verbose)
+        cummulative_num_correct +=num_correct
+        cummulative_total_diff += total_diff
+
+    return cummulative_num_correct, cummulative_total_diff
 
 
-def trainOutputClassifier(trainExamples, vocab):
+
+def trainOutputClassifier(trainExamples, valExamples, vocab):
+
+    import pdb; pdb.set_trace()
 
     contextTargetPairs = generateDataset(trainExamples, vocab, use_shuffle=False)
+    contextTargetPairs_val = generateDataset(valExamples, vocab, use_shuffle = True)
 
     classifier = OutputClassifier(hidden_dim=256, goals_size=6, embed_dim=256, vocabulary = vocab)
     optimizer = optim.SGD(classifier.parameters(), lr=0.01)
@@ -190,17 +202,28 @@ def trainOutputClassifier(trainExamples, vocab):
     loss_plot = []
     iters_to_plot = 100
     iters_to_save = 500
+    iters_to_validate = 100
 
     epoch_loss = 0
     num_correct_epoch = 0
     total_diff_epoch = 0
+    num_correct_val_epoch = 0
+    total_diff_val_epoch = 0
     epoch_loss_plot = []
     num_correct_plot = []
     total_diff_plot = []
+    num_correct_val_plot = []
+    total_diff_val_plot = []
 
     trainingSize = 50
+    validationSize = 50
     trainingSet = contextTargetPairs[:trainingSize]
-    num_iters = 101
+    validationSet = contextTargetPairs_val[:validationSize]
+
+    assert(len(trainingSet) == trainingSize)
+    assert(len(validationSet) == validationSize)
+
+    num_iters = 3001
     for iter in range(num_iters):
         context, target, example = trainingSet[iter % trainingSize]
 
@@ -222,6 +245,11 @@ def trainOutputClassifier(trainExamples, vocab):
         num_correct_epoch += num_correct
         total_diff_epoch += total_diff
 
+        if ((iter % iters_to_validate) == 0):
+            num_correct_val, total_diff_val = validate(validationSet, classifier)
+            num_correct_val_plot.append(num_correct_val/validationSize)
+            total_diff_val_plot.append(total_diff_val/validationSize)
+
         loss_plot.append(loss)
         epoch_loss += loss
 
@@ -235,6 +263,10 @@ def trainOutputClassifier(trainExamples, vocab):
                 json.dump(num_correct_plot, fp)
             with open("plots/TotalDifferenceInOutput.json", "w") as fp:
                 json.dump(total_diff_plot, fp)
+            with open("plots/NumCorrectOutputsValidation.json", "w") as fp:
+                json.dump(num_correct_val_plot, fp)
+            with open("plots/TotalDifferenceInOutputValidation.json", "w") as fp:
+                json.dump(total_diff_val_plot, fp)
 
         if ((iter % iters_to_save) == 0):
             #torch.save(classifier.state_dict(), "savedModels/outputClassifier.pth")
@@ -250,15 +282,13 @@ def trainOutputClassifier(trainExamples, vocab):
 
     ### evaluate:
     print("Validating on examples in training set:")
-    validate(trainingSet[:10], classifier)
+    validate(trainingSet[:10], classifier, verbose=True)
 
     print("Validating on unseen examples:")
-    validationSet = contextTargetPairs[trainingSize:trainingSize+15]
-    validate(validationSet, classifier)
+    validate(validationSet, classifier, verbose=True)
     
-
     print("Checking validation with model loaded from file")
-    validate(validationSet[:5], classifier, "savedModels/outputClassifier.pth")
+    validate(validationSet[:5], classifier, verbose=True, savedPath = "savedModels/outputClassifier.pth")
 
 
 
@@ -269,10 +299,13 @@ if __name__ == '__main__':
     with open(args.train_data_json, "r") as fp:
         trainExamples = json.load(fp)
 
+    with open(args.val_data_json, "r") as fp:
+        valExamples = json.load(fp)
+
     with open(args.train_vocab_json, "r") as fp:
         vocab = json.load(fp)
 
-    trainOutputClassifier(trainExamples, vocab)
+    trainOutputClassifier(trainExamples, valExamples, vocab)
 
 
 

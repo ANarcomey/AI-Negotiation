@@ -191,15 +191,16 @@ def parsePartnerInput(line, verbose = False):
     return input_tuples
     
 
-def exploreTrainingData(filepath, num_examples_to_parse = None):
+def exploreTrainingData(filepath_in, filepath_out, num_examples_to_parse = None):
 
     Examples = []
 
-    if not os.path.isfile(filepath):
-       print("File path {} does not exist. Exiting...".format(filepath))
+    if not os.path.isfile(filepath_in):
+       print("File path {} does not exist. Exiting...".format(filepath_in))
        sys.exit()
 
-    fp = open(filepath, 'r') 
+    print("Loading txt data from {}", filepath_in)
+    fp = open(filepath_in, 'r') 
 
     for i,line in enumerate(fp):
         if (num_examples_to_parse != None and i >= num_examples_to_parse):
@@ -213,7 +214,9 @@ def exploreTrainingData(filepath, num_examples_to_parse = None):
 
         Examples.append(example_dict)
 
-    with open("data/train.json", "w") as fp_json:
+    print("Saving to {}", filepath_out)
+
+    with open(filepath_out, "w") as fp_json:
         json.dump(Examples, fp_json)
 
 def parseExample(line):
@@ -246,7 +249,8 @@ def exampleToString(example):
     return result
 
 
-
+#### TODO: filter out low frequency words and replace them with "<UNK>"
+# format exactly as "<UNK>", implementation of training code depends on that particular UNK token
 def buildVocabulary(trainExamples, filepath):
     vocabulary = set()
 
@@ -270,15 +274,25 @@ if __name__ == '__main__':
 
     args = parse_arguments()
 
-    #exploreTrainingData(args.train_data)
-
+    exploreTrainingData(args.train_data, args.train_data_json)
     ##to load json file:
     with open(args.train_data_json, "r") as fp:
-        Examples = json.load(fp)
+        trainExamples = json.load(fp)
 
-    print("\n\n\n\n\n Displaying training examples loaded from json:")
-    print("There are ", len(Examples), " training examples")
-    '''for ex in Examples:
+
+
+    exploreTrainingData(args.val_data, args.val_data_json)
+    with open(args.val_data_json, "r") as fp:
+        valExamples = json.load(fp)
+        
+
+    print("There are", len(trainExamples), "training examples")
+    print("There are", len(valExamples), "validation examples")
+    
+
+    '''print("\n\n\n\n\n Displaying training examples loaded from json:")
+    print("There are ", len(trainExamples), " training examples")
+    for ex in Examples:
         print(ex)
         print("\n")
         print(exampleToString(ex))
@@ -289,7 +303,7 @@ if __name__ == '__main__':
     with open(args.train_vocab_json, "r") as fp:
         vocab = json.load(fp)
         print("There are ", len(vocab), "words in the vocabulary")
-        print("Loaded vocab = ", vocab)
+        #print("Loaded vocab = ", vocab)
 
 
 

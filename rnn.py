@@ -115,7 +115,7 @@ class GoalsEncoder(nn.Module):
         return output
 
 class OutputClassifier(nn.Module):
-    def __init__(self, hidden_dim, goals_size, embed_dim, vocabulary):
+    def __init__(self, hidden_dim, goals_size, embed_dim, vocabulary, useGRU = True):
         super(OutputClassifier, self).__init__()
 
         self.output_dim = 6
@@ -138,7 +138,7 @@ class OutputClassifier(nn.Module):
         self.softmax = nn.LogSoftmax(dim=1)
 
         self.GRU = nn.GRU(embed_dim + goals_size, hidden_dim)
-        self.useGRU = True
+        self.useGRU = useGRU
 
     def forward(self, input, prev_hidden, h_goals):
 
