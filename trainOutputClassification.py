@@ -197,7 +197,7 @@ def trainOutputClassifier(trainExamples, valExamples, vocab):
 
     #classifier = OutputClassifier(hidden_dim=256, goals_size=6, embed_dim=256, vocabulary = vocab)
     classifier = torch.load("savedModels/outputClassifier.pth")
-    optimizer = optim.SGD(classifier.parameters(), lr=0.01)
+    optimizer = optim.Adam(classifier.parameters(), lr=0.001)
 
     criterion = nn.NLLLoss()
 
@@ -280,14 +280,14 @@ def trainOutputClassifier(trainExamples, valExamples, vocab):
 
         if ((iter % iters_to_save) == 0):
             #torch.save(classifier.state_dict(), "savedModels/outputClassifier.pth")
-            torch.save(classifier, "savedModels/outputClassifier.pth")
+            torch.save(classifier, "savedModels/outputClassifierNew.pth")
 
 
-    torch.save(classifier, "savedModels/outputClassifier.pth")
+    torch.save(classifier, "savedModels/outputClassifierNew.pth")
     print("done")
 
     #savedModel = classifier.load_state_dict(torch.load("savedModels/outputClassifier.pth"))
-    savedModel = torch.load("savedModels/outputClassifier.pth")
+    savedModel = torch.load("savedModels/outputClassifierNew.pth")
 
 
     ### evaluate:
@@ -298,7 +298,7 @@ def trainOutputClassifier(trainExamples, valExamples, vocab):
     validate(validationSet, classifier, verbose=True)
     
     print("Checking validation with model loaded from file")
-    validate(validationSet[:5], classifier, verbose=True, savedPath = "savedModels/outputClassifier.pth")
+    validate(validationSet[:5], classifier, verbose=True, savedPath = "savedModels/outputClassifierNew.pth")
 
 
 

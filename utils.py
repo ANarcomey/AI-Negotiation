@@ -26,7 +26,7 @@ def toTensor(input, input_type):
     if input_type == "goals":
         goals_size = 6
         num_items = 3
-        output = torch.zeros(goals_size, dtype = torch.float)
+        output = torch.zeros(goals_size, dtype=torch.float)
         for i in range(num_items):
             output[2*i] = input[i][0]
             output[2*i +1] = input[i][1]
@@ -36,7 +36,7 @@ def toTensor(input, input_type):
         num_items = 3
         agentOutput = input[0]
         opponentOutput = input[1]
-        output = torch.tensor(agentOutput + opponentOutput, dtype = torch.float)
+        output = torch.tensor(agentOutput + opponentOutput, dtype=torch.float)
         return output
     else:
         return None
