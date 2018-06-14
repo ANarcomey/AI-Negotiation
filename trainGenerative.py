@@ -110,8 +110,8 @@ def generateDataset(trainExamples, vocab, use_shuffle = True, skip_disagreement 
 
             utterance_idx = [wordToIndex[word] if word in wordToIndex else wordToIndex["<UNK>"] for word in utterance]
 
-            #Clip the speaker token or eos token???
-            target_tensor = torch.tensor(utterance_idx, dtype=torch.long)
+            #Clip the speaker token
+            target_tensor = torch.tensor(utterance_idx[1:], dtype=torch.long)
 
             running_context_tensor = torch.tensor(running_context, dtype=torch.long)
             contextResponsePairs.append((running_context_tensor, target_tensor))
@@ -281,13 +281,13 @@ def trainGenerativeModel(trainExamples, valExamples, vocab):
 
     goals_encoder = GoalsEncoder(hidden_dim=64, output_dim=64, input_dim=6)
     goals_encoder_optimizer = optim.SGD(goals_encoder.parameters(), lr=0.01)'''
-    encoder = torch.load("savedModels/encoder.pth")
+    encoder = torch.load("savedModels/encoderTrained.pth")
     encoder_optimizer = optim.SGD(encoder.parameters(), lr=0.01)
 
-    decoder = torch.load("savedModels/decoder.pth")
+    decoder = torch.load("savedModels/decoderTrained.pth")
     decoder_optimizer = optim.SGD(decoder.parameters(), lr=0.01)
 
-    goals_encoder = GoalsEncoder(hidden_dim=64, output_dim=64, input_dim=6)
+    goals_encoder = torch.load("savedModels/goals_encoderTrained.pth")
     goals_encoder_optimizer = optim.SGD(goals_encoder.parameters(), lr=0.01)
 
     criterion = nn.NLLLoss()
@@ -307,6 +307,7 @@ def trainGenerativeModel(trainExamples, valExamples, vocab):
     token_total_epoch = 0
     token_accuracy_epoch_plot = []
     loss_val_plot = []
+    loss_train_plot = []
     '''num_correct_epoch = 0
     total_diff_epoch = 0
     num_correct_val_epoch = 0
@@ -351,8 +352,9 @@ def trainGenerativeModel(trainExamples, valExamples, vocab):
         if ((iter % iters_to_validate) == 0):
 
             #print("Validating on training set:")
-            accuracy_train, _ = validate(trainingSet, goals_encoder, encoder, decoder, criterion, indexToWord, wordToIndex)
+            accuracy_train, loss_train = validate(trainingSet, goals_encoder, encoder, decoder, criterion, indexToWord, wordToIndex)
             token_accuracy_train_plot.append(accuracy_train)
+            loss_train_plot.append(loss_train)
 
             #print("Validating on validation set:")
             accuracy_val, loss_val = validate(validationSet, goals_encoder, encoder, decoder, criterion, indexToWord, wordToIndex)
@@ -374,14 +376,21 @@ def trainGenerativeModel(trainExamples, valExamples, vocab):
                 json.dump(token_accuracy_val_plot, fp)
             with open("plots/ValidationLoss.json", "w") as fp:
                 json.dump(loss_val_plot, fp)
+            with open("plots/TrainingEvalLoss.json", "w") as fp:
+                json.dump(loss_train_plot, fp)
         
         if ((iter % iters_to_save) == 0):
             torch.save(encoder, "savedModels/encoder.pth")
             torch.save(decoder, "savedModels/decoder.pth")
+            torch.save(goals_encoder, "savedModels/goals_encoder.pth")
 
 
     torch.save(encoder, "savedModels/encoder.pth")
     torch.save(decoder, "savedModels/decoder.pth")
+    torch.save(goals_encoder, "savedModels/goals_encoder.pth")
+
+    goals_encoder_saved = torch.load("savedModels/goals_encoder.pth")
+
     print("\n\n\nFinished Training\n\n\n")
 
     ### evaluate:
@@ -392,7 +401,7 @@ def trainGenerativeModel(trainExamples, valExamples, vocab):
     validate(validationSet, goals_encoder, encoder, decoder, criterion, indexToWord, wordToIndex, verbose=True)
     
     print("Checking validation with model loaded from file")
-    validate(validationSet[:5], goals_encoder, encoder, decoder, criterion, indexToWord, wordToIndex, verbose=True, \
+    validate(validationSet[:5], goals_encoder_saved, encoder, decoder, criterion, indexToWord, wordToIndex, verbose=True, \
         savedEncoderPath = "savedModels/encoder.pth", savedDecoderPath = "savedModels/decoder.pth")
 
 

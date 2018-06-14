@@ -5,9 +5,12 @@ import json
 import random
 
 import numpy as np
+import torch
 
 from config import parse_arguments
 from readData import exampleToString, parseExample
+from rnn import OutputClassifier, GoalsEncoder, RNNEncoder, RNNDecoder
+from trainOutputClassification import findBestValidPrediction
 import utils
 
 items = ["book", "hat", "ball"]
@@ -573,6 +576,177 @@ def botToBotTest(trainExamples):
     print("average score for responding bot = ", total_responder_score/float(total_negotations))
     print("average score overall = ", (total_starter_score + total_responder_score)/(total_negotations*2))
 
+def rnnBotConsole(trainExamples, vocab):
+
+    #import pdb; pdb.set_trace()
+
+    vocab.append("<START>")
+    vocab.append("<sos>")
+    vocab.append("<eos>")
+    vocab.append("YOU")
+    vocab.append("THEM")
+    if "<UNK>" not in vocab:
+        vocab.append("<UNK>")
+    vocab = sorted(vocab)
+
+    wordToIndex, indexToWord = utils.getIndexTranslations(vocab)
+
+
+    #encoder = torch.load("savedModels/encoderTrained.pth")
+    #decoder = torch.load("savedModels/decoderTrained.pth")
+    #goals_encoder = torch.load("savedModels/goals_encoderTrained.pth")
+    encoder = torch.load("savedModels/encoder.pth")
+    decoder = torch.load("savedModels/decoder.pth")
+    goals_encoder = torch.load("savedModels/goals_encoder.pth")
+    output_classifier = torch.load("savedModels/outputClassifier.pth")
+
+
+
+    while(True):
+        index = random.choice(range(len(trainExamples)))
+        ex = trainExamples[index]
+
+        bot_input = ex["input"]
+        opponent_input = ex["partner input"]
+        print("\n\nOpponent input = " + inputToString(opponent_input))
+        #print("Bot input = ", inputToString(bot_input))
+
+        total_counts = [count for count,value in bot_input]
+        bot_values = [value for count,value in bot_input]
+        opponent_values = [value for count,value in opponent_input]
+
+        '''bot_value_sort = np.argsort((np.multiply(bot_values, total_counts)))
+
+        mostValuableIndex = bot_value_sort[len(items) -1]
+        middleIndex = bot_value_sort[1]
+        leastValuableIndex = bot_value_sort[0]
+
+        botItems, opponentItems = None, None
+
+        attemptedTopItem = False
+        num_attempts = 0'''
+
+        bot_goals_tensor = utils.toTensor(bot_input, "goals")
+        encoded_goals = goals_encoder(bot_goals_tensor)
+
+        running_context = ["<START>"]
+
+
+        botStarting = random.choice([True, False])
+        if(botStarting):
+
+            #encode
+            encoder_input = torch.tensor([wordToIndex["<START>"]], dtype=torch.long)[0]
+            hidden = encoder.initHidden()
+            hidden = encoder(encoder_input, hidden, encoded_goals)
+
+            #decode
+            selected_tokens = []
+
+            encoded_context = hidden
+            hidden = decoder.initHidden()
+            decoder_input = torch.tensor([wordToIndex["<sos>"]], dtype=torch.long)[0]
+            while(True):
+                output, hidden = decoder(decoder_input, encoded_context, hidden, encoded_goals)
+
+                #categorical = torch.distributions.Categorical(output)
+                #selected_token = categorical.sample()
+                selected_token_probability, selected_token = torch.max(output, 1)
+
+                selected_token_as_word = indexToWord[int(selected_token[0].numpy())]
+
+                if (selected_token_as_word == "<eos>"):
+                    break
+
+                #if(selected_token_as_word != "THEM" and selected_token_as_word != "YOU"):
+                selected_tokens.append(selected_token_as_word)
+
+                decoder_input = selected_token[0]
+
+            print("Bot statement: ", " ".join(selected_tokens))
+            running_context += ["YOU"] + selected_tokens + ["<eos>"]
+            #print("running context = ", running_context)
+
+
+        while(True):
+            input_str = input('Enter a response: ')
+            if(input_str == "<selection>"):
+                running_context += ["THEM", "<selection>"]
+                break
+
+            tokenized = tokenize(input_str)
+
+            running_context += ["THEM"] + tokenized + ["<eos>"]
+            #print("running_context = ", running_context)
+
+            running_context_idx = [wordToIndex[word] if word in wordToIndex else wordToIndex["<UNK>"] for word in running_context]
+            running_context_tensor = torch.tensor(running_context_idx, dtype=torch.long)
+
+            context = running_context_tensor
+            hidden = encoder.initHidden()
+            num_context_words = context.size(0)
+            for i in range(num_context_words):
+                hidden = encoder(context[i], hidden, encoded_goals)
+
+            #decode
+            maxResponseLen = 50
+            selected_tokens = []
+            encoded_context = hidden
+            hidden = decoder.initHidden()
+            decoder_input = torch.tensor([wordToIndex["<sos>"]], dtype=torch.long)[0]
+            while(True):
+                output, hidden = decoder(decoder_input, encoded_context, hidden, encoded_goals)
+
+                selected_token_probability, selected_token = torch.max(output, 1)
+
+                selected_token_as_word = indexToWord[int(selected_token[0].numpy())]
+
+                if (selected_token_as_word == "<eos>"):
+                    break
+
+                #if(selected_token_as_word != "THEM" and selected_token_as_word != "YOU"):
+                selected_tokens.append(selected_token_as_word)
+
+
+                if(len(selected_tokens) >= maxResponseLen):
+                    break
+
+                decoder_input = selected_token[0]
+
+
+            print("Bot response: ", " ".join(selected_tokens))
+            running_context += ["YOU"] + selected_tokens + ["<eos>"]
+
+            if (selected_tokens == ["<selection>"]):
+                break
+
+        #print("final running context = ", " ".join(running_context))
+        running_context_idx = [wordToIndex[word] if word in wordToIndex else wordToIndex["<UNK>"] for word in running_context]
+        running_context_tensor = torch.tensor(running_context_idx, dtype=torch.long)
+
+        num_words = running_context_tensor.size(0)
+
+        hidden = output_classifier.initHidden()
+        for i in range(num_words):
+            outputs, hidden = output_classifier(running_context_tensor[i], hidden, bot_goals_tensor)
+
+        # in form: counts = [count1, count2, count3, opponent_count1, opponent_count2, opponent_count3]
+        bot_selection = findBestValidPrediction(outputs, bot_input)
+        bot_counts = bot_selection[:3]
+        player_counts = bot_selection[3:]
+
+        print("Bot input = ", inputToString(bot_input))
+        print("Bot items: ", countsToString(bot_counts))
+        print("Player items: ", countsToString(player_counts))
+
+        print("Bot score = ", np.sum(np.multiply(bot_counts, bot_values)))
+        print("Opponent score = ", np.sum(np.multiply(player_counts, opponent_values)))
+
+
+
+        sentinel = input("Type 'quit' to exit, anything else to run another example: ")
+        if (sentinel == 'quit'):
+            break
 
 
 if __name__ == '__main__':
@@ -582,15 +756,20 @@ if __name__ == '__main__':
     with open(args.train_data_json, "r") as fp:
         trainExamples = json.load(fp)
 
+    with open(args.train_vocab_json, "r") as fp:
+        vocab = json.load(fp)
+
     #testFeatureExtraction()
 
     #simpleTest("testing/parseCountsTests.txt")
 
     #testResponses("testing/inputs.txt")
 
-    completeConversation(trainExamples)
+    #completeConversation(trainExamples)
 
     #botToBot(trainExamples)
     #botToBotTest(trainExamples)
+
+    rnnBotConsole(trainExamples, vocab)
 
 

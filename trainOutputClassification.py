@@ -66,6 +66,7 @@ def eval_output(outputs, target, example, verbose = False):
             total_diff += int(abs(predictions2[i] - target[i]))
 
         if(verbose):
+            print("example = ", example)
             print("target = ", target)
             #print("outputs = ", outputs)
             print("predictions = ", predictions)
@@ -77,7 +78,8 @@ def eval_output(outputs, target, example, verbose = False):
 #train Examples is list of dictionary entries, loaded from json
 def generateDataset(trainExamples, vocab, use_shuffle = True):
     
-
+    vocab.append("<START>")
+    vocab.append("<sos>")
     vocab.append("<eos>")
     vocab.append("YOU")
     vocab.append("THEM")
@@ -132,7 +134,7 @@ def generateDataset(trainExamples, vocab, use_shuffle = True):
         contextTargetPairs.append((context, target, example))
 
     if (use_shuffle):
-        shuffle(contextTargetPairs)
+        random.shuffle(contextTargetPairs)
 
     return contextTargetPairs
 
@@ -193,7 +195,8 @@ def trainOutputClassifier(trainExamples, valExamples, vocab):
     contextTargetPairs = generateDataset(trainExamples, vocab, use_shuffle=False)
     contextTargetPairs_val = generateDataset(valExamples, vocab, use_shuffle = True)
 
-    classifier = OutputClassifier(hidden_dim=256, goals_size=6, embed_dim=256, vocabulary = vocab)
+    #classifier = OutputClassifier(hidden_dim=256, goals_size=6, embed_dim=256, vocabulary = vocab)
+    classifier = torch.load("savedModels/outputClassifier.pth")
     optimizer = optim.SGD(classifier.parameters(), lr=0.01)
 
     criterion = nn.NLLLoss()
@@ -202,7 +205,7 @@ def trainOutputClassifier(trainExamples, valExamples, vocab):
     loss_plot = []
     iters_to_plot = 100
     iters_to_save = 500
-    iters_to_validate = 100
+    iters_to_validate = 200
 
     epoch_loss = 0
     num_correct_epoch = 0
@@ -210,20 +213,22 @@ def trainOutputClassifier(trainExamples, valExamples, vocab):
     num_correct_val_epoch = 0
     total_diff_val_epoch = 0
     epoch_loss_plot = []
-    num_correct_plot = []
-    total_diff_plot = []
+    #num_correct_plot = []
+    #total_diff_plot = []
     num_correct_val_plot = []
     total_diff_val_plot = []
+    num_correct_train_plot = []
+    total_diff_train_plot = []
 
-    trainingSize = 50
-    validationSize = 50
+    trainingSize = len(contextTargetPairs)
+    validationSize = 500
     trainingSet = contextTargetPairs[:trainingSize]
     validationSet = contextTargetPairs_val[:validationSize]
 
     assert(len(trainingSet) == trainingSize)
     assert(len(validationSet) == validationSize)
 
-    num_iters = 3001
+    num_iters = len(contextTargetPairs) + 1
     for iter in range(num_iters):
         context, target, example = trainingSet[iter % trainingSize]
 
@@ -233,10 +238,10 @@ def trainOutputClassifier(trainExamples, valExamples, vocab):
             epoch_loss_plot.append(epoch_loss/trainingSize)
             epoch_loss = 0
 
-            num_correct_plot.append(num_correct_epoch/trainingSize)
-            total_diff_plot.append(total_diff_epoch/trainingSize)
-            num_correct_epoch = 0
-            total_diff_epoch = 0
+            #num_correct_plot.append(num_correct_epoch/trainingSize)
+            #total_diff_plot.append(total_diff_epoch/trainingSize)
+            #num_correct_epoch = 0
+            #total_diff_epoch = 0
 
 
         loss, outputs = train(context, target, classifier, optimizer, criterion)
@@ -250,22 +255,27 @@ def trainOutputClassifier(trainExamples, valExamples, vocab):
             num_correct_val_plot.append(num_correct_val/validationSize)
             total_diff_val_plot.append(total_diff_val/validationSize)
 
+            num_correct_train, total_diff_train = validate(trainingSet, classifier)
+            num_correct_train_plot.append(num_correct_train/trainingSize)
+            total_diff_train_plot.append(total_diff_train/trainingSize)
+
+
         loss_plot.append(loss)
         epoch_loss += loss
 
 
         if ((iter % iters_to_plot) == 0):
-            with open("plots/TrainingLossIter.json", "w") as fp:
+            with open("plots1/TrainingLossIter.json", "w") as fp:
                 json.dump(loss_plot, fp)
-            with open("plots/TrainingLossEpoch.json", "w") as fp:
+            with open("plots1/TrainingLossEpoch.json", "w") as fp:
                 json.dump(epoch_loss_plot, fp)
-            with open("plots/NumCorrectOutputs.json", "w") as fp:
-                json.dump(num_correct_plot, fp)
-            with open("plots/TotalDifferenceInOutput.json", "w") as fp:
-                json.dump(total_diff_plot, fp)
-            with open("plots/NumCorrectOutputsValidation.json", "w") as fp:
+            with open("plots1/NumCorrectOutputsTrain.json", "w") as fp:
+                json.dump(num_correct_train_plot, fp)
+            with open("plots1/TotalDifferenceInOutputTrain.json", "w") as fp:
+                json.dump(total_diff_train_plot, fp)
+            with open("plots1/NumCorrectOutputsValidation.json", "w") as fp:
                 json.dump(num_correct_val_plot, fp)
-            with open("plots/TotalDifferenceInOutputValidation.json", "w") as fp:
+            with open("plots1/TotalDifferenceInOutputValidation.json", "w") as fp:
                 json.dump(total_diff_val_plot, fp)
 
         if ((iter % iters_to_save) == 0):

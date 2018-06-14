@@ -18,7 +18,7 @@ import utils
 #nn.Linear: applies a linear transformation to the incoming data: y=Ax+b
 
 class RNNEncoder(nn.Module):
-    def __init__(self, hidden_dim, goals_size, embed_dim, vocabulary):
+    def __init__(self, hidden_dim, goals_size, embed_dim, vocabulary, useGRU = True):
             super(RNNEncoder, self).__init__()
             self.hidden_dim = hidden_dim
             self.embed_dim = embed_dim
@@ -28,8 +28,11 @@ class RNNEncoder(nn.Module):
 
             self.W_hx = nn.Linear(embed_dim + goals_size, hidden_dim)
             self.W_hh = nn.Linear(hidden_dim, hidden_dim)
-            self.activation = nn.ReLU()
+            self.activation = nn.Tanh()
             self.embedding = nn.Embedding(len(vocabulary), embed_dim)
+
+            self.GRU = nn.GRU(embed_dim + goals_size, hidden_dim)
+            self.useGRU = useGRU
             
 
     def forward(self, input, prev_hidden, h_goals):
@@ -44,15 +47,21 @@ class RNNEncoder(nn.Module):
 
         embedded_input = self.embedding(input)
         input_combined = torch.cat((embedded_input, h_goals), 1)
-        new_hidden = self.W_hx(input_combined) + self.W_hh(prev_hidden)
-        new_hidden = self.activation(new_hidden)
+
+        if(self.useGRU):
+            _, new_hidden = self.GRU(input_combined.view(1, 1, -1), prev_hidden.view(1, 1, -1))
+            new_hidden = new_hidden.squeeze(0)
+        else:
+            new_hidden = self.W_hx(input_combined) + self.W_hh(prev_hidden)
+            new_hidden = self.activation(new_hidden)
+
         return new_hidden
 
     def initHidden(self):
         return torch.zeros(1, self.hidden_dim)
 
 class RNNDecoder(nn.Module):
-    def __init__(self, hidden_dim, goals_size, embed_dim, vocabulary):
+    def __init__(self, hidden_dim, goals_size, embed_dim, vocabulary, useGRU = True):
             super(RNNDecoder, self).__init__()
             self.hidden_dim = hidden_dim
             self.goals_size = goals_size
@@ -67,10 +76,14 @@ class RNNDecoder(nn.Module):
             self.W_hh = nn.Linear(hidden_dim, hidden_dim)
             self.W_out = nn.Linear(hidden_dim, self.vocabulary_size)
 
-            self.activation = nn.ReLU()
+            self.activation = nn.Tanh()
+            self.embedding = nn.Embedding(len(vocabulary), embed_dim)
             self.softmax = nn.LogSoftmax(dim=1)
 
-    def forward(self, input, context, prev_hidden):
+            self.GRU = nn.GRU(embed_dim + goals_size + self.context_size, hidden_dim)
+            self.useGRU = useGRU
+
+    def forward(self, input, context, prev_hidden, h_goals):
         #input is word embedding
 
         #make sure input is N x input_dim, where N is batch size, which can just be 1
@@ -80,10 +93,17 @@ class RNNDecoder(nn.Module):
         assert(input.shape == torch.Size([1]))
         assert(h_goals.shape == torch.Size([1, self.goals_size]))
         assert(prev_hidden.shape == torch.Size([1, self.hidden_dim]))
+        assert(context.shape == torch.Size([1, self.context_size]))
 
-        input_combined = torch.cat((input, self.h_goals, context), 1)
-        new_hidden = self.W_hy(input_combined) + self.W_hh(prev_hidden)
-        new_hidden = self.activation(new_hidden)
+        embedded_input = self.embedding(input)
+        input_combined = torch.cat((embedded_input, h_goals, context), 1)
+
+        if(self.useGRU):
+            _, new_hidden = self.GRU(input_combined.view(1, 1, -1), prev_hidden.view(1, 1, -1))
+            new_hidden = new_hidden.squeeze(0)
+        else:
+            new_hidden = self.W_hy(input_combined) + self.W_hh(prev_hidden)
+            new_hidden = self.activation(new_hidden)
 
         output = self.W_out(new_hidden)
         output = self.softmax(output)
@@ -95,23 +115,25 @@ class RNNDecoder(nn.Module):
         #maybe use context???
 
 class GoalsEncoder(nn.Module):
-    def __init__(self, goals, embed_dim, hidden_dim, vocabulary):
+    def __init__(self, input_dim, output_dim, hidden_dim):
         super(GoalsEncoder, self).__init__()
 
-        self.goals = goals
-        self.embed_dim = embed_dim
-        self.vocabulary = vocabulary
+        self.hidden_dim = hidden_dim
+        self.output_dim = output_dim
+        self.input_dim = input_dim
 
 
-        self.inputLayer = nn.Linear(goals.shape[0], hidden_dim)
-        self.outputLayer = nn.Linear(hidden_dim, embed_dim)
+        self.inputLayer = nn.Linear(input_dim, hidden_dim)
+        self.outputLayer = nn.Linear(hidden_dim, output_dim)
         self.activation = nn.ReLU()
 
     def forward(self, input):
+        input = input.view(1, -1)
         output = self.inputLayer(input)
         output = self.activation(output)
 
         output = self.outputLayer(output)
+        output = self.activation(output)
         return output
 
 class OutputClassifier(nn.Module):
