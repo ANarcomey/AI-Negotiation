@@ -19,9 +19,15 @@ To create virtual environment:
 >deactivate                         # Exit virtual environment
 >```
 
-## Script
+## Files
 
-Run
-`run.sh`
+Use `readData.py` to process the data from .txt files to a highly-formatted list of dictionaries for each example. 
+The formatted data is saved in .json files
 
-If there's a permission issue with the script, run 'chmod +x run.sh' in terminal
+All of the models are defined in `rnn.py`
+
+Train the negotiation output classifier using `trainOutputClassification.py`
+
+Train the encoder and decoder RNNs to generate natural langauge responses in negotiation using `trainGenerative.py`
+
+Converse with negotiation bots, either one operating by handcrafted rules or the RNN encoder/decoder bot using `converse.py`
